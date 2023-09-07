@@ -1,3 +1,15 @@
+# Discrete Fourier Transform Visualisation
+
+![image](https://github.com/playwithalgos/dft-visualisation/assets/43071857/ec08fa9c-18e6-43cd-921b-bca198a556c6)
+
+
+## Features
+
+- compute the DFT of a signal
+- draw a new signal (closed curve)
+- enable/disable frequencies and update the signal accordingly
+
+
 # create-svelte
 
 Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
