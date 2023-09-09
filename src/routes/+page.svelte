@@ -5,7 +5,6 @@
     const prec = 32;
     const SPEED = 0.01;
 
-
     let currentFrequency = undefined;
     let spectrum = [
         [0, 3],
@@ -18,9 +17,9 @@
         [0.0, 1],
         ...Array(100).fill([0, 0]),
     ];
+    let enabled = Array(200).fill(true);
 
     let frequenciesAlreadyChanged = [];
-    let disabled = [];
 
     let points = [];
 
@@ -59,10 +58,10 @@
         return spectrum;
     }
 
-    function contrib(spectrum, disabled, t, j) {
+    function contrib(spectrum, enabled, t, j) {
         const N = spectrum.length;
-        const spX = disabled[j] ? 0 : spectrum[j][0];
-        const spY = disabled[j] ? 0 : spectrum[j][1];
+        const spX = enabled[j] ? spectrum[j][0] : 0;
+        const spY = enabled[j] ? spectrum[j][1] : 0;
         const angle =
             j < N / 2 ? (2 * PI * j * t) / N : (-2 * PI * (N - j) * t) / N;
         return [
@@ -70,12 +69,12 @@
             spX * sin(angle) + spY * cos(angle),
         ];
     }
-    function point(spectrum, disabled, t, i) {
+    function point(spectrum, enabled, t, i) {
         const c = [0, 0];
         const N = spectrum.length;
         if (i == undefined) i = N;
         for (let j = 0; j < i; j++) {
-            const A = contrib(spectrum, disabled, t, j);
+            const A = contrib(spectrum, enabled, t, j);
             c[0] += A[0];
             c[1] += A[1];
         }
@@ -115,7 +114,7 @@
     on:mousedown={() => {
         points = [];
         spectrum = [];
-        disabled = [];
+        enabled = [];
         frequenciesAlreadyChanged = [];
     }}
     on:mousemove={(evt) => {
@@ -145,9 +144,10 @@
         points.push([p.x, p.y]);
 
         spectrum = dft(points, -1, 1 / points.length);
+        enabled = Array(points.length).fill(true);
         const max = Math.max(...spectrum.map((s) => norm(s)));
         for (let i = 0; i < spectrum.length; i++)
-            if (norm(spectrum[i]) < max / 100) spectrum[i] = [0, 0];
+            if (norm(spectrum[i]) < max / 50) spectrum[i] = [0, 0];
 
         //if(spectrum.length - 1 > 8)
         points = points; //dft(spectrum, 1, 1);
@@ -155,35 +155,35 @@
     on:mouseup={() => (points = [])}
 >
     {#each spectrum as s, i}
-        {#if !disabled[i]}
+        {#if enabled[i]}
             <circle
-                cx={point(spectrum, disabled, t, i)[0]}
-                cy={point(spectrum, disabled, t, i)[1]}
+                cx={point(spectrum, enabled, t, i)[0]}
+                cy={point(spectrum, enabled, t, i)[1]}
                 class="point"
                 fill={getColor(i)}
                 fill-opacity="0.2"
             />
             <circle
-                cx={point(spectrum, disabled, t, i)[0]}
-                cy={point(spectrum, disabled, t, i)[1]}
+                cx={point(spectrum, enabled, t, i)[0]}
+                cy={point(spectrum, enabled, t, i)[1]}
                 r={norm(s)}
                 class="wheel"
                 opacity={currentFrequency == i ? 1 : 0.2}
                 fill={getColor(i)}
             />
             <circle
-                cx={point(spectrum, disabled, t, i)[0]}
-                cy={point(spectrum, disabled, t, i)[1]}
+                cx={point(spectrum, enabled, t, i)[0]}
+                cy={point(spectrum, enabled, t, i)[1]}
                 r={norm(s)}
                 stroke-opacity="0.01"
                 stroke={getColor(i)}
                 fill="none"
             />
             <line
-                x1={point(spectrum, disabled, t, i)[0]}
-                y1={point(spectrum, disabled, t, i)[1]}
-                x2={point(spectrum, disabled, t, i + 1)[0]}
-                y2={point(spectrum, disabled, t, i + 1)[1]}
+                x1={point(spectrum, enabled, t, i)[0]}
+                y1={point(spectrum, enabled, t, i)[1]}
+                x2={point(spectrum, enabled, t, i + 1)[0]}
+                y2={point(spectrum, enabled, t, i + 1)[1]}
                 stroke-opacity="1"
                 stroke={getColor(i)}
             />
@@ -191,14 +191,14 @@
     {/each}
 
     <circle
-        cx={point(spectrum, disabled, t)[0]}
-        cy={point(spectrum, disabled, t)[1]}
+        cx={point(spectrum, enabled, t)[0]}
+        cy={point(spectrum, enabled, t)[1]}
         class="currentPoint"
     />
     {#each { length: prec * spectrum.length } as _, tt}
         <circle
-            cx={point(spectrum, disabled, tt / prec)[0]}
-            cy={point(spectrum, disabled, tt / prec)[1]}
+            cx={point(spectrum, enabled, tt / prec)[0]}
+            cy={point(spectrum, enabled, tt / prec)[1]}
             class="point"
             fill-opacity="0.9"
             fill={points.length == 0 ? "white" : "gray"}
@@ -206,7 +206,7 @@
     {/each}
 
     {#each points as s, i}
-        <circle cx={s[0]} cy={s[1]} class="point" fill={"red"} />
+        <circle cx={s[0]} cy={s[1]} class="point" fill={"white"} />
     {/each}
 
     <circle cx={0} cy={0} class="point" fill={"white"} stroke="red" />
@@ -217,21 +217,23 @@
 Frequencies:
 {#each spectrum as s, i}
     {#if norm(s) > 0}
-        <span class="frequency">
+        <span
+            class="frequency"
+            on:mouseenter={() => {
+                currentFrequency = i;
+            }}
+            on:mouseleave={() => {
+                currentFrequency = undefined;
+            }}
+        >
             <svg
                 class="frequencySVG"
-                style={disabled[i] ? "filter: grayscale(1)" : "none"}
+                style={enabled[i] ? "none" : "filter: grayscale(1)"}
                 width={widthSpectrum(s)}
                 height={widthSpectrum(s)}
                 viewBox={`${-realWidthSpectrum(s)} ${-realWidthSpectrum(s)} ${
                     2 * realWidthSpectrum(s)
                 } ${2 * realWidthSpectrum(s)}`}
-                on:mouseenter={() => {
-                    currentFrequency = i;
-                }}
-                on:mouseleave={() => {
-                    currentFrequency = undefined;
-                }}
                 on:click={() => {}}
             >
                 <circle
@@ -262,13 +264,13 @@ Frequencies:
                 <line
                     x1={0}
                     y1={0}
-                    x2={contrib(spectrum, disabled, t, i)[0]}
-                    y2={contrib(spectrum, disabled, t, i)[1]}
+                    x2={contrib(spectrum, enabled, t, i)[0]}
+                    y2={contrib(spectrum, enabled, t, i)[1]}
                     stroke-opacity="0.8"
                     stroke={getColor(i)}
                 />
                 <text
-                    stroke={disabled[i] ? "lightgray" : "white"}
+                    stroke={enabled[i] ? "lightgray" : "white"}
                     font-size="3"
                     text-anchor="middle">{i}</text
                 >
@@ -277,7 +279,7 @@ Frequencies:
             <input
                 id={"inputCheckbox" + i}
                 type="checkbox"
-                bind:checked={disabled[i]}
+                bind:checked={enabled[i]}
             />
         </span>
     {/if}
