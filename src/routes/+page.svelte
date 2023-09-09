@@ -2,8 +2,11 @@
     const cos = Math.cos;
     const sin = Math.sin;
     const PI = Math.PI;
-    const prec = 1;
+    const prec = 32;
+    const SPEED = 0.01;
 
+
+    let currentFrequency = undefined;
     let spectrum = [
         [0, 3],
         [6, 0],
@@ -16,16 +19,19 @@
         ...Array(100).fill([0, 0]),
     ];
 
+    let frequenciesAlreadyChanged = [];
+    let disabled = [];
+
     let points = [];
 
     let colors = [
-        "black",
         "brown",
         "red",
         "orange",
-        "rgb(192, 128, 0)",
+        "yellow",
+        "lightgreen",
         "green",
-        "rgb(0, 128, 128)",
+        "cyan",
         "blue",
         "purple",
     ];
@@ -53,21 +59,23 @@
         return spectrum;
     }
 
-    function contrib(spectrum, t, j) {
+    function contrib(spectrum, disabled, t, j) {
         const N = spectrum.length;
+        const spX = disabled[j] ? 0 : spectrum[j][0];
+        const spY = disabled[j] ? 0 : spectrum[j][1];
+        const angle =
+            j < N / 2 ? (2 * PI * j * t) / N : (-2 * PI * (N - j) * t) / N;
         return [
-            spectrum[j][0] * cos((2 * PI * j * t) / N) -
-                spectrum[j][1] * sin((2 * PI * j * t) / N),
-            spectrum[j][0] * sin((2 * PI * j * t) / N) +
-                spectrum[j][1] * cos((2 * PI * j * t) / N),
+            spX * cos(angle) - spY * sin(angle),
+            spX * sin(angle) + spY * cos(angle),
         ];
     }
-    function point(spectrum, t, i) {
+    function point(spectrum, disabled, t, i) {
         const c = [0, 0];
         const N = spectrum.length;
         if (i == undefined) i = N;
         for (let j = 0; j < i; j++) {
-            const A = contrib(spectrum, t, j);
+            const A = contrib(spectrum, disabled, t, j);
             c[0] += A[0];
             c[1] += A[1];
         }
@@ -77,24 +85,27 @@
     let t = 0;
 
     setInterval(() => {
-        t += 1 / prec;
-    }, 30);
+        t += SPEED * spectrum.length;
+    }, 50);
 
     function norm(v) {
         return Math.sqrt(v[0] ** 2 + v[1] ** 2);
     }
 
     function widthSpectrum(s) {
-        return Math.max(16, norm(s) * 8);
+        return Math.max(24, norm(s) * 8);
     }
 
     function realWidthSpectrum(s) {
-        return Math.max(16, norm(s) * 8) / 8;
+        return Math.max(24, norm(s) * 8) / 8;
     }
 </script>
 
-<h1>DFT visualisation</h1>
+<h1>Discrete Fourier Transform Visualisation</h1>
 
+<span class="help">(draw below a closed curve)</span>
+
+<br />
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svg
     id="main"
@@ -104,8 +115,11 @@
     on:mousedown={() => {
         points = [];
         spectrum = [];
+        disabled = [];
+        frequenciesAlreadyChanged = [];
     }}
     on:mousemove={(evt) => {
+        if (frequenciesAlreadyChanged.length > 0) return;
         if (evt.buttons == 0) return;
 
         // Create an SVGPoint for future math
@@ -133,136 +147,180 @@
         spectrum = dft(points, -1, 1 / points.length);
         const max = Math.max(...spectrum.map((s) => norm(s)));
         for (let i = 0; i < spectrum.length; i++)
-            if (norm(spectrum[i]) < max / 50) spectrum[i] = [0, 0];
+            if (norm(spectrum[i]) < max / 100) spectrum[i] = [0, 0];
 
         //if(spectrum.length - 1 > 8)
         points = points; //dft(spectrum, 1, 1);
     }}
+    on:mouseup={() => (points = [])}
 >
     {#each spectrum as s, i}
-        <circle
-            cx={point(spectrum, t, i)[0]}
-            cy={point(spectrum, t, i)[1]}
-            class="point"
-            fill={getColor(i)}
-            fill-opacity="0.2"
-        />
-        <circle
-            cx={point(spectrum, t, i)[0]}
-            cy={point(spectrum, t, i)[1]}
-            r={norm(s)}
-            fill-opacity="0.1"
-            fill={getColor(i)}
-        />
-        <circle
-            cx={point(spectrum, t, i)[0]}
-            cy={point(spectrum, t, i)[1]}
-            r={norm(s)}
-            stroke-opacity="0.01"
-            stroke={getColor(i)}
-            fill="none"
-        />
-        <line
-            x1={point(spectrum, t, i)[0]}
-            y1={point(spectrum, t, i)[1]}
-            x2={point(spectrum, t, i + 1)[0]}
-            y2={point(spectrum, t, i + 1)[1]}
-            stroke-opacity="0.8"
-            stroke={getColor(i)}
-        />
+        {#if !disabled[i]}
+            <circle
+                cx={point(spectrum, disabled, t, i)[0]}
+                cy={point(spectrum, disabled, t, i)[1]}
+                class="point"
+                fill={getColor(i)}
+                fill-opacity="0.2"
+            />
+            <circle
+                cx={point(spectrum, disabled, t, i)[0]}
+                cy={point(spectrum, disabled, t, i)[1]}
+                r={norm(s)}
+                class="wheel"
+                opacity={currentFrequency == i ? 1 : 0.2}
+                fill={getColor(i)}
+            />
+            <circle
+                cx={point(spectrum, disabled, t, i)[0]}
+                cy={point(spectrum, disabled, t, i)[1]}
+                r={norm(s)}
+                stroke-opacity="0.01"
+                stroke={getColor(i)}
+                fill="none"
+            />
+            <line
+                x1={point(spectrum, disabled, t, i)[0]}
+                y1={point(spectrum, disabled, t, i)[1]}
+                x2={point(spectrum, disabled, t, i + 1)[0]}
+                y2={point(spectrum, disabled, t, i + 1)[1]}
+                stroke-opacity="1"
+                stroke={getColor(i)}
+            />
+        {/if}
     {/each}
-    {#each points as s, i}
-        <circle cx={s[0]} cy={s[1]} class="point" fill={"red"} />
-    {/each}
+
     <circle
-        cx={point(spectrum, t)[0]}
-        cy={point(spectrum, t)[1]}
+        cx={point(spectrum, disabled, t)[0]}
+        cy={point(spectrum, disabled, t)[1]}
         class="currentPoint"
     />
     {#each { length: prec * spectrum.length } as _, tt}
         <circle
-            cx={point(spectrum, tt / prec)[0]}
-            cy={point(spectrum, tt / prec)[1]}
+            cx={point(spectrum, disabled, tt / prec)[0]}
+            cy={point(spectrum, disabled, tt / prec)[1]}
             class="point"
-            fill-opacity="0.2;"
-            fill={"black"}
+            fill-opacity="0.9"
+            fill={points.length == 0 ? "white" : "gray"}
         />
     {/each}
 
-    <circle
-        cx={0}
-        cy={0}
-        class="point"
-        fill={"white"}
-        stroke-width="0.01"
-        stroke="red"
-    />
+    {#each points as s, i}
+        <circle cx={s[0]} cy={s[1]} class="point" fill={"red"} />
+    {/each}
+
+    <circle cx={0} cy={0} class="point" fill={"white"} stroke="red" />
 </svg>
 <br />
+
+<!-- a comment here -->
+Frequencies:
 {#each spectrum as s, i}
-    <svg
-        width={widthSpectrum(s)}
-        height={widthSpectrum(s)}
-        viewBox={`${-realWidthSpectrum(s)} ${-realWidthSpectrum(s)} ${
-            2 * realWidthSpectrum(s)
-        } ${2 * realWidthSpectrum(s)}`}
-    >
-        <circle cx={0} cy={0} r={0.02} fill={getColor(i)} fill-opacity="1" />
+    {#if norm(s) > 0}
+        <span class="frequency">
+            <svg
+                class="frequencySVG"
+                style={disabled[i] ? "filter: grayscale(1)" : "none"}
+                width={widthSpectrum(s)}
+                height={widthSpectrum(s)}
+                viewBox={`${-realWidthSpectrum(s)} ${-realWidthSpectrum(s)} ${
+                    2 * realWidthSpectrum(s)
+                } ${2 * realWidthSpectrum(s)}`}
+                on:mouseenter={() => {
+                    currentFrequency = i;
+                }}
+                on:mouseleave={() => {
+                    currentFrequency = undefined;
+                }}
+                on:click={() => {}}
+            >
+                <circle
+                    cx={0}
+                    cy={0}
+                    r={0.5}
+                    fill={getColor(i)}
+                    fill-opacity="1"
+                />
 
-        <circle
-            cx={0}
-            cy={0}
-            r={norm(s)}
-            fill-opacity="0.2"
-            fill={getColor(i)}
-        />
+                <circle
+                    cx={0}
+                    cy={0}
+                    r={norm(s)}
+                    fill={getColor(i)}
+                    class="wheel"
+                />
 
-        <line
-            x1={0}
-            y1={0}
-            x2={s[0]}
-            y2={s[1]}
-            stroke-opacity="1"
-            stroke={getColor(i)}
-        />
+                <line
+                    x1={0}
+                    y1={0}
+                    x2={s[0]}
+                    y2={s[1]}
+                    stroke-opacity="1"
+                    stroke={"white"}
+                />
 
-        <line
-            x1={0}
-            y1={0}
-            x2={contrib(spectrum, t, i)[0]}
-            y2={contrib(spectrum, t, i)[1]}
-            stroke-opacity="0.8"
-            stroke={getColor(i)}
-        />
-    </svg>
+                <line
+                    x1={0}
+                    y1={0}
+                    x2={contrib(spectrum, disabled, t, i)[0]}
+                    y2={contrib(spectrum, disabled, t, i)[1]}
+                    stroke-opacity="0.8"
+                    stroke={getColor(i)}
+                />
+                <text
+                    stroke={disabled[i] ? "lightgray" : "white"}
+                    font-size="3"
+                    text-anchor="middle">{i}</text
+                >
+            </svg>
+            <br />
+            <input
+                id={"inputCheckbox" + i}
+                type="checkbox"
+                bind:checked={disabled[i]}
+            />
+        </span>
+    {/if}
 {/each}
+
+<br />
+<span class="help">(click to disable/enable some frequencies)</span>
 
 <style>
     @keyframes blinking {
         0% {
-            r: 0.5px;
-            fill: red;
+            r: 0.2px;
+            fill: white;
         }
         90% {
             r: 1px;
-            fill: red;
+            fill: white;
         }
         95% {
             r: 1px;
-            fill: red;
+            fill: white;
         }
         100% {
-            r: 0px;
-            fill: red;
+            r: 0.2px;
+            fill: white;
         }
     }
     .currentPoint {
         animation-name: blinking;
         animation-duration: 500ms;
         animation-iteration-count: infinite;
-        fill: red;
+        fill: white;
         fill-opacity: 1;
         vector-effect: non-scaling-radius;
+    }
+
+    :global(body) {
+        background: rgb(41, 41, 41);
+        color: white;
+    }
+
+    #main {
+        background: black;
     }
 
     svg * {
@@ -273,5 +331,34 @@
     .point {
         r: 0.2px;
         vector-effect: non-scaling-radius;
+    }
+
+    .wheel {
+        fill-opacity: 0.6;
+    }
+
+    text {
+        user-select: none;
+    }
+
+    .frequencySVG {
+        cursor: pointer;
+        background: "none";
+    }
+
+    input {
+        cursor: pointer;
+    }
+    .frequency {
+        display: inline-block;
+    }
+
+    h1 {
+        font-size: 20px;
+    }
+
+    .help {
+        color: lightgoldenrodyellow;
+        font-size: 12px;
     }
 </style>
